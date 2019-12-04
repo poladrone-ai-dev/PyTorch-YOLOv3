@@ -149,6 +149,9 @@ if __name__ == "__main__":
     cmap = plt.get_cmap("tab20b")
     colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
+    # count the total number of boxes drawn (with and without overlap)
+    box_count = 0
+
     print("\nSaving images:")
     # Iterate through images and save plot of detections
     for img_i, (path, detections) in enumerate(zip(imgs, img_detections)):
@@ -174,6 +177,7 @@ if __name__ == "__main__":
             box_idx = 0
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
                 if classes[int(cls_pred)] == "palm0":
+                # if True:
                     print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
 
                     if x1 < 0:
@@ -279,31 +283,24 @@ if __name__ == "__main__":
                     color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
 
                     # Create a Rectangle patch
+                    # RGB_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
-                    cv2.rectangle(img, (x1, y1), (x2, y2), (255,0,0), 2)
+                    cv2.rectangle(img, (x1, y1), (x2, y2), (255,255,255), 2)
                     cv2.imwrite(f"output/samples/{os.path.basename(path)[:-4]}.png", img)
-
-                    # Add label
-                    plt.text(
-                        x1,
-                        y1,
-                        s=classes[int(cls_pred)] + " " + str(round(cls_conf.data.tolist(), 2)),
-                        color="white",
-                        verticalalignment="top",
-                        bbox={"color": color, "pad": 0},
-                    )
+                    cv2.putText(img, classes[int(cls_pred)], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+                    box_count += 1
 
     # with open("detections.json", 'w') as fp:
     #     json.dump(detectionJson, fp, indent=4)
 
     print("Total inference time: " + str(total_time - start_time))
-    # print("Image json: " + str(image_json))
-
     with open("image_json.json", "w") as img_json:
         json.dump(image_json, img_json, indent=4)
 
     overlap_detect = overlap_detection.OverlapDetect([500, 500], image_json)
     start = time.time()
-    overlap_detect.find_overlap()
+    overlap_count = overlap_detect.find_overlap()
     end = time.time()
+
+    print("Number of trees detected: " + str(box_count - overlap_count))
     print("Time elapsed for overlap detection: " + str(end - start) + " seconds.")

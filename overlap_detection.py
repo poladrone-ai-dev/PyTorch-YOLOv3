@@ -25,6 +25,7 @@ class OverlapDetect():
 
         self.overlap_count = 0
         self.corner_case_count = 0
+        self.non_overlap_count = 0
         self.left_right_overlap_dict = {}
         self.up_down_overlap_dict = {}
         self.x_offset = tile_offset[0]
@@ -143,8 +144,8 @@ class OverlapDetect():
         # bottom_left = [x_coord + self.x_offset, y_coord - self.y_offset]
         # bottom = [x_coord + self.x_offset, y_coord]
         # bottom_right = [x_coord + self.x_offset, y_coord + self.y_offset]
-
         ########################################################################
+
         # columns first
         top_left = [x_coord - self.x_offset, y_coord - self.y_offset]
         top_right = [x_coord + self.x_offset, y_coord - self.y_offset]
@@ -166,13 +167,11 @@ class OverlapDetect():
 
         for neighbor in neighbors:
             neighbor_name = ''
-            neighbor_name = filename + "_" + '0' + str(neighbor[0]) + '_' + '0' + str(neighbor[1]) + extension
-            print("Neighbor name: " + neighbor_name)
+            neighbor_name = filename + "_" + str(neighbor[0]) + '_' + str(neighbor[1]) + extension
 
             if neighbor_name in image_json:
                 neighbor_tiles.append(neighbor_name)
 
-        print("neighbor tiles: " + str(neighbor_tiles))
         return neighbor_tiles
 
     # gets the neighbor tile's position relative to a reference tile
@@ -204,7 +203,7 @@ class OverlapDetect():
         #
         # if [image[0] + self.x_offset, image[1] + self.y_offset] == neighbor:
         #     return 'bottomright'
-        #######################################################################
+        #########################################################################
 
         # column first
         if [image[0] - self.x_offset, image[1] - self.y_offset] == neighbor:
@@ -257,10 +256,11 @@ class OverlapDetect():
                                         }
                                         self.overlap_count += 1
                                     else:
+                                        print(self.up_down_overlap_dict[image]["class"])
                                         self.up_down_overlap_dict[image]["neighbor"].append(neighbor)
                                         self.up_down_overlap_dict[image]["neighbor_type"].append("top")
                                         self.up_down_overlap_dict[image]["box"].append(neighbor_box)
-                                        self.image_json[image]["class"].append(object)
+                                        self.up_down_overlap_dict[image]["class"].append(object)
                                         self.overlap_count += 1
 
     def bottom_overlap(self, image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh):
@@ -391,47 +391,41 @@ class OverlapDetect():
         up_down_x_thresh = 50
         up_down_y_thresh = 10
 
-        print("Image json length: " + str(len(self.image_json)))
-        print("Imagae json : " + str(self.image_json) )
         for image in self.image_json:
-            print(image)
+
             # find the image's neighbors by the tile coordinates
             neighbors = self.find_neighbor(self.image_json, image)
             image_coords = self.get_tile_coordinates(image)
-
-            print("Image coords: " + str(image_coords))
-            print("Neighbor count: " + str(len(neighbors)))
 
             for neighbor in neighbors:
                 neighbor_coords = self.get_tile_coordinates(neighbor)
                 neighbor_type = self.get_neighbor_position(image_coords, neighbor_coords)
 
-                print("Neighbor coords: " + str(neighbor_coords))
-                print("Neighbor type: " + str(neighbor_type))
-
                 if neighbor_type == "right":
                     self.right_overlap(self.image_json, image, neighbor, left_right_x_thresh, left_right_y_thresh)
 
-                if neighbor_type == "left":
+                elif neighbor_type == "left":
                     self.left_overlap(self.image_json, image, neighbor, left_right_x_thresh, left_right_y_thresh)
 
-                if neighbor_type == "top":
+                elif neighbor_type == "top":
                     self.top_overlap(self.image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh)
 
-                if neighbor_type == "bottom":
+                elif neighbor_type == "bottom":
                     self.bottom_overlap(self.image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh)
 
-                if neighbor_type == "bottomright":
+                elif neighbor_type == "bottomright":
                     self.bottomright_overlap(self.image_json, image, neighbor)
 
-        print("Number of overlapping objects without considering corner cases: " + str(int(self.overlap_count / 2)))
-        print("Number of overlapping objects: " + str(int(self.overlap_count / 2) - 3 * (self.corner_case_count)))
-        print("Corner case count: " + str(self.corner_case_count))
-        print("Left right dict: " + str(self.left_right_overlap_dict) + '\n')
-        print("Up down dict: " + str(self.up_down_overlap_dict) + '\n')
+            self.non_overlap_count += 1
 
-        # self.draw_bbox_neighbor(self.image_json, left_right_overlap_dict, up_down_overlap_dict)
+        # print("Number of overlapping objects without considering corner cases: " + str(int(self.overlap_count / 2)))
+        # print("Number of non-overlapping objects: " + str(self.non_overlap_count))
+        print("Number of overlapping objects: " + str(int(self.overlap_count / 2) - 3 * self.corner_case_count))
+        # print("Corner case count: " + str(self.corner_case_count))
+        # print("Left right dict: " + str(self.left_right_overlap_dict) + '\n')
+        # print("Up down dict: " + str(self.up_down_overlap_dict) + '\n')
         # self.draw_bbox(self.image_json)
+        return int(self.overlap_count / 2) - 3 * self.corner_case_count
 
     def init_json(self):
         os.chdir(self.IMG_PATH)
@@ -494,7 +488,6 @@ class OverlapDetect():
                             "class": object_class
                         }
                         bbox_count += 1
-
 
 if __name__ == "__main__":
     image_json = {}
