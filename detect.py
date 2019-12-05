@@ -87,36 +87,6 @@ if __name__ == "__main__":
     imgs = []  # Stores image paths
     img_detections = []  # Stores detections for each image index
 
-    # json file containing tiff information
-    # tiff_info_file = r'meraub.json'
-
-    # tiff file infos
-    upper_left_x = 0
-    upper_left_y = 0
-    lower_right_x = 0
-    lower_right_y = 0
-    width = 0
-    height = 0
-    xres = 0
-    yres = 0
-
-    # with open(tiff_info_file, 'r') as json_file:
-    #     data = json.load(json_file)
-    #     upper_left_x = data["upper_left_x"]
-    #     upper_left_y = data["upper_left_y"]
-    #     lower_right_x = data["lower_right_x"]
-    #     lower_right_y = data["lower_right_y"]
-    #     width = data["width"]
-    #     height = data["height"]
-    #     xres = data["xres"]
-    #     yres = data["yres"]
-
-    # json object for storing the detection boxes
-    # detectionJson = {
-    #     "type": "FeatureCollection",
-    #     "features" : []
-    # }
-
     # for storing image info for overlap detection
     image_json = {}
 
@@ -161,9 +131,6 @@ if __name__ == "__main__":
 
         print("(%d) Image: '%s'" % (img_i, path))
 
-        # image_name = path.replace("data/samples\\","")
-        # detectionJson["features"][0][image_name] = {}
-
         # Create plot
         img = np.array(Image.open(path))
 
@@ -198,66 +165,6 @@ if __name__ == "__main__":
                     center_x = ((x1.item() + x2.item()) / 2)
                     center_y = ((y1.item() + y2.item()) / 2)
 
-                    # xmin_tiff = upper_left_x + (x1 / xres)
-                    # ymin_tiff = upper_left_y + (y1 / yres)
-                    # xmax_tiff = upper_left_x + (x2 / xres)
-                    # ymax_tiff = upper_left_y + (y2 / yres)
-                    # box_w_tiff = abs(box_w / xres)
-                    # box_h_tiff = abs(box_h / yres)
-
-                    # hypotenuse = math.sqrt( (xmax_tiff-xmin_tiff) ** 2 + (ymax_tiff - ymin_tiff) ** 2 )
-                    #
-                    # upper_left_corner = [xmin_tiff.data.tolist(), ymin_tiff.data.tolist()]
-                    # upper_right_corner = [xmax_tiff.data.tolist(), ymin_tiff.data.tolist()]
-                    # lower_left_corner = [xmin_tiff.data.tolist(), ymax_tiff.data.tolist()]
-                    # lower_right_corner = [xmax_tiff.data.tolist(), ymax_tiff.data.tolist()]
-
-                    # boxname = "box" + str(box_idx)
-                    # detectionJson["features"][0][image_name][boxname] = {
-                    #     "
-                    #     ": conf.data.tolist(),
-                    #     "cls_conf": cls_conf.data.tolist(),
-                    #     "cls_pred": cls_pred.data.tolist(),
-                    #     "xmin": x1.data.tolist(),
-                    #     "xmax": x2.data.tolist(),
-                    #     "ymin": y1.data.tolist(),
-                    #     "ymax": y2.data.tolist(),
-                    #     "xmin_tiff": xmin_tiff.data.tolist(),
-                    #     "ymin_tiff": ymin_tiff.data.tolist(),
-                    #     "xmax_tiff": xmax_tiff.data.tolist(),
-                    #     "ymax_tiff": ymax_tiff.data.tolist(),
-                    #     "width": box_w.data.tolist(),
-                    #     "height": box_h.data.tolist(),
-                    #     "width_tiff": box_w_tiff.data.tolist(),
-                    #     "height_tiff": box_h_tiff.data.tolist(),
-                    #     "label": classes[int(cls_pred)]
-                    # }
-
-                    # detectionJson["features"].append(
-                    # {
-                    #     "type": "Feature",
-                    #     "geometry": {
-                    #         "type": "Polygon",
-                    #         "coordinates": [
-                    #             [
-                    #                 upper_right_corner, upper_left_corner, lower_left_corner, lower_right_corner, upper_right_corner
-                    #             ]
-                    #         ],
-                    #     },
-                    #     "properties":
-                    #     {
-                    #         "conf": conf.data.tolist(),
-                    #         "cls_conf": cls_conf.data.tolist(),
-                    #         "cls_pred": cls_pred.data.tolist(),
-                    #         "width_tiff": box_w_tiff.data.tolist(),
-                    #         "height_tiff": box_h_tiff.data.tolist(),
-                    #         "label": classes[int(cls_pred)],
-                    #     }
-                    # })
-
-                    # print(classes[int(cls_pred)])
-                    # sys.exit()
-
                     box_idx += 1
                     image_name = os.path.basename(path)
 
@@ -283,7 +190,6 @@ if __name__ == "__main__":
                     color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
 
                     # Create a Rectangle patch
-                    # RGB_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                     bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
                     cv2.rectangle(img, (x1, y1), (x2, y2), (255,255,255), 2)
                     cv2.imwrite(f"output/samples/{os.path.basename(path)[:-4]}.png", img)
@@ -293,19 +199,19 @@ if __name__ == "__main__":
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
                     box_count += 1
 
-    # with open("detections.json", 'w') as fp:
-    #     json.dump(detectionJson, fp, indent=4)
-
     print("Total inference time: " + str(total_time - start_time))
     with open("image_json.json", "w") as img_json:
         json.dump(image_json, img_json, indent=4)
 
+    print("Image json: " + str(image_json))
+
     overlap_detect = overlap_detection.OverlapDetect([500, 500], image_json)
     start = time.time()
     overlap_count = overlap_detect.find_overlap()
+    # overlap_detect.merge_detections(r"D:\PyTorch-YOLOv3-master\output\samples\redrawn_bbox", r"D:\PyTorch-YOLOv3-master\output")
+    detection_json = overlap_detect.add_offset_to_bbox_coords()
+    overlap_detect.export_detection_result(detection_json)
     end = time.time()
 
     print("Number of trees detected: " + str(box_count - overlap_count))
     print("Time elapsed for overlap detection: " + str(end - start) + " seconds.")
-
-    overlap_detect.merge_detections(r"D:\PyTorch-YOLOv3-master\output\samples", r"D:\PyTorch-YOLOv3-master\output")

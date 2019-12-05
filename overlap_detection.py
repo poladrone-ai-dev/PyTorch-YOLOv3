@@ -31,6 +31,13 @@ class OverlapDetect():
         self.x_offset = tile_offset[0]
         self.y_offset = tile_offset[1]
 
+        self.base_coords = []
+
+    # find the nth occurrence of a character in a string
+    # param {string} haystack: target string
+    # param {char} needle: target character
+    # param {int} n: the nth occurrence
+    # return {int} start: the index of the nth occurrence of target character
     def find_nth(self, haystack, needle, n):
         start = haystack.find(needle)
         while start >= 0 and n > 1:
@@ -38,11 +45,60 @@ class OverlapDetect():
             n -= 1
         return start
 
+    def get_reference_image(self, image_path):
+        os.chdir(image_path)
+        image_types = ['.png', '.jpg', '.PNG', '.JPG', '.tif']
+        images = []
+        fullpath_images = []
+
+        for image in glob.glob("*"):
+            if os.path.splitext(image)[1] in image_types:
+                images.append(image)
+                fullpath_images.append(os.path.join(image_path, image))
+
+        # reference image for doing offset math
+        self.base_coords = self.get_tile_coordinates(images[0])
+
+    # find the tile offset of an image from the reference image (top left image)
+    # param {list} base_coords: the tile coordinates for reference image
+    # param {list} image_coords: the tile coordinates for target image
+    # return {int, int}: the x offset and y offset for target image
     def calculate_offset(self, base_coords, image_coords):
         x_offset = image_coords[0] - base_coords[0]
         y_offset = image_coords[1] - base_coords[1]
         return x_offset, y_offset
 
+    # exports detection json to files with corresponding names
+    def export_detection_result(self, output_json):
+        output_path = os.path.join(r"D:\PyTorch-YOLOv3-master\output", "detection_output")
+
+        if not os.path.isdir(output_path):
+            os.mkdir(output_path)
+
+        for image in output_json:
+            image_name = os.path.splitext(image)[0]
+            json.dump(output_json[image], open(os.path.join(output_path, image_name + '.json'), 'w'), indent=4)
+
+    # adds offset to bounding box coordinates in image json
+    # returns {dict} output_json: a copy of image_json with offsets added
+    def add_offset_to_bbox_coords(self):
+        output_json = self.image_json.copy()
+        for image in output_json:
+            image_coords = self.get_tile_coordinates(os.path.basename(image))
+            x_offset, y_offset = self.calculate_offset(self.base_coords, image_coords)
+
+            for box in output_json[image]:
+                if "box" in box:
+                    output_json[image][box]["xmin"] = round(output_json[image][box]["xmin"] + x_offset, 3)
+                    output_json[image][box]["ymin"] = round(output_json[image][box]["ymin"] + y_offset, 3)
+                    output_json[image][box]["xmax"] = round(output_json[image][box]["xmax"] + x_offset, 3)
+                    output_json[image][box]["ymax"] = round(output_json[image][box]["ymax"] + y_offset, 3)
+
+        return output_json
+
+    # merges output detection pictures into one larger picture, using the image names for position indexing
+    # param {string} image_path: path that contains the input images
+    # param {string} output_path: path to store the merged image
     def merge_detections(self, image_path, output_path):
         os.chdir(image_path)
         image_types = ['.png', '.jpg', '.PNG', '.JPG', '.tif']
@@ -55,7 +111,7 @@ class OverlapDetect():
                 fullpath_images.append(os.path.join(image_path, image))
 
         # reference image for doing offset math
-        base_coords = self.get_tile_coordinates(images[0])
+        # self.base_coords = self.get_tile_coordinates(images[0])
 
         image_name = os.path.splitext(image)[0].split('_')[0]
         imgs = [Image.open(i) for i in fullpath_images]
@@ -73,7 +129,7 @@ class OverlapDetect():
             if img.height > min_img_height:
                 imgs[i] = img.resize((min_img_height, int(img.height / img.width * min_img_height)), Image.ANTIALIAS)
 
-            x_offset, y_offset = self.calculate_offset(base_coords, image_coords)
+            x_offset, y_offset = self.calculate_offset(self.base_coords, image_coords)
 
             if x_offset > 0 and y_offset == 0:
                 total_width += imgs[i].width
@@ -89,7 +145,7 @@ class OverlapDetect():
 
         for i in range(len(imgs)):
             image_coords = self.get_tile_coordinates(os.path.basename(imgs[i].filename))
-            x_offset, y_offset = self.calculate_offset(base_coords, image_coords)
+            x_offset, y_offset = self.calculate_offset(self.base_coords, image_coords)
 
             if x_offset > 0 and y_offset == 0:
                 x_dimen += 1
@@ -137,6 +193,9 @@ class OverlapDetect():
             plt.savefig(os.path.join(output_path, image), bbox_inches="tight", pad_inches=0.0)
             plt.close()
 
+    # get the tile coordinates of target image
+    # param {string} filename: name of the target file
+    # returns {list} coordinates: tile coordinates of the image
     def get_tile_coordinates(self, filename):
         underscore_count = len(re.findall('_', filename))
         first_underscore = self.find_nth(filename, '_', underscore_count - 1)
@@ -147,6 +206,10 @@ class OverlapDetect():
         coordinates = [x_coord, y_coord]
         return coordinates
 
+    # get image name with the specified tile coordinates
+    # param {string} image: the name of the reference image
+    # param {list} coords: the tile coordinates of the new image
+    # returns {string} image_name: name of the image
     def get_image_name_from_tile(self, image, coords):
         first_underscore = self.find_nth(image, '_', 1)
         filename = image[:first_underscore]
@@ -154,7 +217,11 @@ class OverlapDetect():
         image_name = filename + "_" + '0' + str(coords[0]) + '_' + '0' + str(coords[1]) + extension
         return image_name
 
-    def find_neighbor(self, image_json, image):
+    # finds a list of existing neighbor images for target image
+    # param {dict} image_json: json file containing the informations of all images
+    # param {string} image: the name of the target image
+    # returns {list} neighbor_images: a list of existing neighbor images
+    def find_neighbor_images(self, image_json, image):
         image_tile = image_json[image]['tile']
         x_coord = image_tile[0]
         y_coord = image_tile[1]
@@ -170,7 +237,7 @@ class OverlapDetect():
         bottom_right = [x_coord + self.x_offset, y_coord + self.y_offset]
 
         neighbors = [top_left, top, top_right, left, right, bottom_left, bottom, bottom_right]
-        neighbor_tiles = []
+        neighbor_images = []
 
         underscore_count = len(re.findall('_', image))
         first_underscore = self.find_nth(image, '_', underscore_count - 1)
@@ -183,9 +250,9 @@ class OverlapDetect():
             neighbor_name = filename + "_" + str(neighbor[0]) + '_' + str(neighbor[1]) + extension
 
             if neighbor_name in image_json:
-                neighbor_tiles.append(neighbor_name)
+                neighbor_images.append(neighbor_name)
 
-        return neighbor_tiles
+        return neighbor_images
 
     # gets the neighbor tile's position relative to a reference tile
     # param {list} image: tile coordinates of the reference image
@@ -219,6 +286,11 @@ class OverlapDetect():
 
         return 'None'
 
+    # looks at two mismatched neighbor boxes and takes the one with the higher width as the width
+    # param {string} image: name of the target image
+    # param {string} neighbor: neighbor image
+    # param {string} box: name of the bounding box in target image
+    # param {string} neighbor_box: name of the bounding box in neighbor image
     def correct_bbox_top_bottom(self, image, neighbor, box, neighbor_box):
         image_bbox_length = abs(self.image_json[image][box]["xmin"] - self.image_json[neighbor][neighbor_box]["xmin"])
         neighbor_bbox_length = abs(self.image_json[image][box]["xmax"] - self.image_json[neighbor][neighbor_box]["xmax"])
@@ -232,6 +304,11 @@ class OverlapDetect():
             self.image_json[image][box]["xmax"] = self.image_json[neighbor][neighbor_box]["xmax"]
             self.image_json[image][box]["width"] = self.image_json[neighbor][neighbor_box]["width"]
 
+    # looks at two mismatched neighbor boxes and takes the one with the higher height as the height
+    # param {string} image: name of the target image
+    # param {string} neighbor: neighbor image
+    # param {string} box: name of the bounding box in target image
+    # param {string} neighbor_box: name of the bounding box in neighbor image
     def correct_bbox_left_right(self, image, neighbor, box, neighbor_box):
         image_bbox_length = abs(self.image_json[image][box]["ymin"] - self.image_json[neighbor][neighbor_box]["ymin"])
         neighbor_bbox_length = abs(self.image_json[image][box]["ymax"] - self.image_json[neighbor][neighbor_box]["ymax"])
@@ -244,7 +321,6 @@ class OverlapDetect():
             self.image_json[image][box]["ymin"] = self.image_json[neighbor][neighbor_box]["ymin"]
             self.image_json[image][box]["ymax"] = self.image_json[neighbor][neighbor_box]["ymax"]
             self.image_json[image][box]["height"] = self.image_json[neighbor][neighbor_box]["height"]
-
 
     def top_overlap(self, image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh):
         for box in image_json[image]:
@@ -405,7 +481,12 @@ class OverlapDetect():
                                 except Exception:
                                     continue
 
+    # find overlapping bounding boxes
+    # returns {int}: returns the number of overlapping bounding boxes
     def find_overlap(self):
+
+        self.get_reference_image(r'D:\PyTorch-YOLOv3-master\output\samples\redrawn_bbox')
+
         # TODO: the statistics for the overlapping objects can be used to calculate the x and y thresholds
         left_right_x_thresh = 10
         left_right_y_thresh = 50
@@ -413,9 +494,8 @@ class OverlapDetect():
         up_down_y_thresh = 10
 
         for image in self.image_json:
-
             # find the image's neighbors by the tile coordinates
-            neighbors = self.find_neighbor(self.image_json, image)
+            neighbors = self.find_neighbor_images(self.image_json, image)
             image_coords = self.get_tile_coordinates(image)
 
             for neighbor in neighbors:
