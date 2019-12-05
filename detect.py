@@ -287,7 +287,10 @@ if __name__ == "__main__":
                     bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
                     cv2.rectangle(img, (x1, y1), (x2, y2), (255,255,255), 2)
                     cv2.imwrite(f"output/samples/{os.path.basename(path)[:-4]}.png", img)
-                    cv2.putText(img, classes[int(cls_pred)], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+                    cv2.putText(img, classes[int(cls_pred)], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, \
+                                1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+                    cv2.putText(img, os.path.basename(path), (0, int(im.height / 2)), \
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
                     box_count += 1
 
     # with open("detections.json", 'w') as fp:
@@ -304,3 +307,5 @@ if __name__ == "__main__":
 
     print("Number of trees detected: " + str(box_count - overlap_count))
     print("Time elapsed for overlap detection: " + str(end - start) + " seconds.")
+
+    overlap_detect.merge_detections(r"D:\PyTorch-YOLOv3-master\output\samples", r"D:\PyTorch-YOLOv3-master\output")

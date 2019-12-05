@@ -38,52 +38,76 @@ class OverlapDetect():
             n -= 1
         return start
 
-    # draws the bounding box on a specific image
-    def draw_bbox_neighbor(self, image_json):
-        output_path = os.path.join(self.IMG_PATH, 'neighbor_detections')
+    def calculate_offset(self, base_coords, image_coords):
+        x_offset = image_coords[0] - base_coords[0]
+        y_offset = image_coords[1] - base_coords[1]
+        return x_offset, y_offset
 
-        for image in image_json:
-            img = np.array(Image.open(os.path.join(self.IMG_PATH, image)))
-            plt.figure()
-            fig, ax = plt.subplots(1)
-            ax.imshow(img)
+    def merge_detections(self, image_path, output_path):
+        os.chdir(image_path)
+        image_types = ['.png', '.jpg', '.PNG', '.JPG']
+        images = []
+        fullpath_images = []
 
-            if image in self.left_right_overlap_dict:
+        for image in glob.glob("*"):
+            if os.path.splitext(image)[1] in image_types:
+                images.append(image)
+                fullpath_images.append(os.path.join(image_path, image))
 
-                left_right_neighbors = self.left_right_overlap_dict[image]["neighbor"]
-                for left_right_neighbor in left_right_neighbors:
-                    index = self.left_right_overlap_dict[image]["neighbor"].index(left_right_neighbor)
-                    box = self.left_right_overlap_dict[image]["box"][index]
-                    x1 = image_json[left_right_neighbor][box]["xmin"]
-                    y1 = image_json[image][box]["ymin"]
-                    box_w = image_json[image][box]["width"]
-                    box_h = image_json[image][box]["height"]
-                    bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor="red", facecolor="none")
-                    ax.add_patch(bbox)
+        # reference image for doing offset math
+        base_coords = self.get_tile_coordinates(images[0])
 
-            if image in self.up_down_overlap_dict:
+        image_name = os.path.splitext(image)[0].split('_')[0]
+        imgs = [Image.open(i) for i in fullpath_images]
 
-                up_down_neighbors = self.up_down_overlap_dict[image]["neighbor"]
-                for up_down_neighbor in up_down_neighbors:
-                    index = self.up_down_overlap_dict[image]["neighbor"].index(up_down_neighbor)
-                    box = self.up_down_overlap_dict[image]["box"][index]
+        min_img_width = min(i.width for i in imgs)
+        min_img_height = min(i.height for i in imgs)
+        total_width = imgs[0].width
+        total_height = imgs[0].height
 
-                    x1 = image_json[up_down_neighbor][box]["xmin"]
-                    y1 = image_json[image][box]["ymin"]
-                    box_w = image_json[image][box]["width"]
-                    box_h = image_json[image][box]["height"]
-                    bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor="red", facecolor="none")
-                    ax.add_patch(bbox)
+        for i, img in enumerate(imgs):
+            image_coords = self.get_tile_coordinates(os.path.basename(img.filename))
 
-            plt.axis("off")
-            plt.gca().xaxis.set_major_locator(NullLocator())
-            plt.gca().yaxis.set_major_locator(NullLocator())
+            if img.width > min_img_width:
+                imgs[i] = img.resize((min_img_width, int(img.height / img.width * min_img_width)), Image.ANTIALIAS)
+            if img.height > min_img_height:
+                imgs[i] = img.resize((min_img_height, int(img.height / img.width * min_img_height)), Image.ANTIALIAS)
 
-            if os.path.isdir(output_path) == False:
-                os.mkdir(output_path)
+            x_offset, y_offset = self.calculate_offset(base_coords, image_coords)
 
-            plt.savefig(os.path.join(output_path, image), bbox_inches="tight", pad_inches=0.0)
-            plt.close()
+            if x_offset > 0 and y_offset == 0:
+                total_width += imgs[i].width
+            elif x_offset == 0 and y_offset > 0:
+                total_height += imgs[i].height
+
+        img_merge = Image.new(imgs[0].mode, (total_width, total_height))
+
+        x_base = 0
+        y_base = 0
+        x_dimen = 1
+        y_dimen = 1
+
+        for i in range(len(imgs)):
+            image_coords = self.get_tile_coordinates(os.path.basename(imgs[i].filename))
+            x_offset, y_offset = self.calculate_offset(base_coords, image_coords)
+
+            if x_offset > 0 and y_offset == 0:
+                x_dimen += 1
+
+            if x_offset == 0 and y_offset > 0:
+                y_dimen += 1
+
+        img_idx = 0
+        for x in range(x_dimen):
+            for y in range(y_dimen):
+                # print("image: " + imgs[img_idx].filename)
+                # print("x offset: " + str(x * imgs[i].width))
+                # print("y offset: " + str(y * imgs[i].height))
+                img_merge.paste(imgs[img_idx], (x_base + x * imgs[i].width, y_base + y * imgs[i].height))
+                img_idx += 1
+
+        img_merge = img_merge.convert("RGB")
+        img_merge.save(os.path.join(output_path, image_name + '_merged.jpg'))
 
     def draw_bbox(self, image_json):
         output_path = os.path.join(self.IMG_PATH, 'neighbor_detections')
@@ -135,17 +159,6 @@ class OverlapDetect():
         x_coord = image_tile[0]
         y_coord = image_tile[1]
 
-        # row first
-        # top_left = [x_coord - self.x_offset, y_coord - self.y_offset]
-        # top = [x_coord - self.x_offset, y_coord]
-        # top_right = [x_coord - self.x_offset, y_coord + self.y_offset]
-        # left = [x_coord, y_coord - self.y_offset]
-        # right = [x_coord, y_coord + self.y_offset]
-        # bottom_left = [x_coord + self.x_offset, y_coord - self.y_offset]
-        # bottom = [x_coord + self.x_offset, y_coord]
-        # bottom_right = [x_coord + self.x_offset, y_coord + self.y_offset]
-        ########################################################################
-
         # columns first
         top_left = [x_coord - self.x_offset, y_coord - self.y_offset]
         top_right = [x_coord + self.x_offset, y_coord - self.y_offset]
@@ -177,57 +190,31 @@ class OverlapDetect():
     # gets the neighbor tile's position relative to a reference tile
     # param {list} image: tile coordinates of the reference image
     # param {list} neighbor: tile coordinates of the reference tile
-    def get_neighbor_position(self, image, neighbor):
-
-        # row first
-        # if [image[0] - self.x_offset, image[1] - self.y_offset] == neighbor:
-        #     return 'topleft'
-        #
-        # if [image[0] - self.x_offset, image[1]] == neighbor:
-        #     return 'top'
-        #
-        # if [image[0] - self.x_offset, image[1] + self.y_offset] == neighbor:
-        #     return 'topright'
-        #
-        # if [image[0], image[1] - self.y_offset] == neighbor:
-        #     return 'left'
-        #
-        # if [image[0], image[1] + self.y_offset] == neighbor:
-        #     return 'right'
-        #
-        # if [image[0] + self.x_offset, image[1] - self.y_offset] == neighbor:
-        #     return 'bottomleft'
-        #
-        # if [image[0] + self.x_offset, image[1]] == neighbor:
-        #     return 'bottom'
-        #
-        # if [image[0] + self.x_offset, image[1] + self.y_offset] == neighbor:
-        #     return 'bottomright'
-        #########################################################################
+    def get_neighbor_position(self, tile, neighbor):
 
         # column first
-        if [image[0] - self.x_offset, image[1] - self.y_offset] == neighbor:
+        if [tile[0] - self.x_offset, tile[1] - self.y_offset] == neighbor:
             return 'topleft'
 
-        if [image[0], image[1] - self.y_offset] == neighbor:
+        if [tile[0], tile[1] - self.y_offset] == neighbor:
             return 'top'
 
-        if [image[0] + self.x_offset, image[1] - self.y_offset] == neighbor:
+        if [tile[0] + self.x_offset, tile[1] - self.y_offset] == neighbor:
             return 'topright'
 
-        if [image[0] - self.x_offset, image[1]] == neighbor:
+        if [tile[0] - self.x_offset, tile[1]] == neighbor:
             return 'left'
 
-        if [image[0] + self.x_offset, image[1]] == neighbor:
+        if [tile[0] + self.x_offset, tile[1]] == neighbor:
             return 'right'
 
-        if [image[0] - self.x_offset, image[1] + self.y_offset] == neighbor:
+        if [tile[0] - self.x_offset, tile[1] + self.y_offset] == neighbor:
             return 'bottomleft'
 
-        if [image[0], image[1] + self.y_offset] == neighbor:
+        if [tile[0], tile[1] + self.y_offset] == neighbor:
             return 'bottom'
 
-        if [image[0] + self.x_offset, image[1] + self.y_offset] == neighbor:
+        if [tile[0] + self.x_offset, tile[1] + self.y_offset] == neighbor:
             return 'bottomright'
 
         return 'None'
@@ -494,8 +481,10 @@ if __name__ == "__main__":
     overlap_detect = OverlapDetect([1, 1])
     overlap_detect.init_json()
     overlap_detect.get_coordinates()
-    pp = pprint.PrettyPrinter(depth=3)
-    pp.pprint(image_json)
+
+    #pp = pprint.PrettyPrinter(depth=3)
+    #pp.pprint(image_json)
+
     start = time.time()
     overlap_detect.find_overlap()
     end = time.time()
