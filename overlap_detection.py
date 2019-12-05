@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 class OverlapDetect():
 
     def __init__(self, tile_offset, image_json = None, image_path=None, xml_path=None):
-        self.IMG_PATH = r'D:\image_processing\output\tree'
+        self.IMG_PATH = r'D:\PyTorch-YOLOv3-master\data\samples'
         self.XML_PATH = r'D:\image_processing\output\tree_annotation'
 
         if image_json == None:
@@ -45,7 +45,7 @@ class OverlapDetect():
 
     def merge_detections(self, image_path, output_path):
         os.chdir(image_path)
-        image_types = ['.png', '.jpg', '.PNG', '.JPG']
+        image_types = ['.png', '.jpg', '.PNG', '.JPG', '.tif']
         images = []
         fullpath_images = []
 
@@ -100,17 +100,17 @@ class OverlapDetect():
         img_idx = 0
         for x in range(x_dimen):
             for y in range(y_dimen):
-                # print("image: " + imgs[img_idx].filename)
-                # print("x offset: " + str(x * imgs[i].width))
-                # print("y offset: " + str(y * imgs[i].height))
-                img_merge.paste(imgs[img_idx], (x_base + x * imgs[i].width, y_base + y * imgs[i].height))
-                img_idx += 1
+                try:
+                    img_merge.paste(imgs[img_idx], (x_base + x * imgs[i].width, y_base + y * imgs[i].height))
+                    img_idx += 1
+                except Exception:
+                    pass
 
         img_merge = img_merge.convert("RGB")
         img_merge.save(os.path.join(output_path, image_name + '_merged.jpg'))
 
     def draw_bbox(self, image_json):
-        output_path = os.path.join(self.IMG_PATH, 'neighbor_detections')
+        output_path = os.path.join(r'D:\PyTorch-YOLOv3-master\output\samples', 'redrawn_bbox')
 
         for image in image_json:
             img = np.array(Image.open(os.path.join(self.IMG_PATH, image)))
@@ -219,6 +219,33 @@ class OverlapDetect():
 
         return 'None'
 
+    def correct_bbox_top_bottom(self, image, neighbor, box, neighbor_box):
+        image_bbox_length = abs(self.image_json[image][box]["xmin"] - self.image_json[neighbor][neighbor_box]["xmin"])
+        neighbor_bbox_length = abs(self.image_json[image][box]["xmax"] - self.image_json[neighbor][neighbor_box]["xmax"])
+
+        if image_bbox_length > neighbor_bbox_length:
+            self.image_json[neighbor][neighbor_box]["xmin"] = self.image_json[image][box]["xmin"]
+            self.image_json[neighbor][neighbor_box]["xmax"] = self.image_json[image][box]["xmax"]
+            self.image_json[neighbor][neighbor_bos]["width"] = self.image_json[image][box]["width"]
+        else:
+            self.image_json[image][box]["xmin"] = self.image_json[neighbor][neighbor_box]["xmin"]
+            self.image_json[image][box]["xmax"] = self.image_json[neighbor][neighbor_box]["xmax"]
+            self.image_json[image][box]["width"] = self.image_json[neighbor][neighbor_box]["width"]
+
+    def correct_bbox_left_right(self, image, neighbor, box, neighbor_box):
+        image_bbox_length = abs(self.image_json[image][box]["ymin"] - self.image_json[neighbor][neighbor_box]["ymin"])
+        neighbor_bbox_length = abs(self.image_json[image][box]["ymax"] - self.image_json[neighbor][neighbor_box]["ymax"])
+
+        if image_bbox_length > neighbor_bbox_length:
+            self.image_json[neighbor][neighbor_box]["ymin"] = self.image_json[image][box]["ymin"]
+            self.image_json[neighbor][neighbor_box]["ymax"] = self.image_json[image][box]["ymax"]
+            self.image_json[neighbor][neighbor_box]["height"] = self.image_json[image][box]["height"]
+        else:
+            self.image_json[image][box]["ymin"] = self.image_json[neighbor][neighbor_box]["ymin"]
+            self.image_json[image][box]["ymax"] = self.image_json[neighbor][neighbor_box]["ymax"]
+            self.image_json[image][box]["height"] = self.image_json[neighbor][neighbor_box]["height"]
+
+
     def top_overlap(self, image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh):
         for box in image_json[image]:
             if "box" in box:
@@ -230,6 +257,8 @@ class OverlapDetect():
                                 if abs(image_json[image][box]["xmin"] - image_json[neighbor][neighbor_box]["xmin"]) <= up_down_x_thresh and \
                                         abs(image_json[image][box]["xmax"] - image_json[neighbor][neighbor_box]["xmax"]) <= up_down_x_thresh and \
                                         image_json[image][box]["class"] == image_json[neighbor][neighbor_box]["class"]:
+
+                                    self.correct_bbox_top_bottom(image, neighbor, box, neighbor_box)
                                     object = image_json[image][box]["class"]
                                     print("Found a top neighbor image.")
                                     print(box + " in " + image + " and " + neighbor_box + " in " + neighbor + " are the same. " +
@@ -261,6 +290,8 @@ class OverlapDetect():
                                 if abs(image_json[image][box]["xmin"] - image_json[neighbor][neighbor_box]["xmin"]) <= up_down_x_thresh and \
                                         abs(image_json[image][box]["xmax"] - image_json[neighbor][neighbor_box]["xmax"]) <= up_down_x_thresh and \
                                         image_json[image][box]["class"] == image_json[neighbor][neighbor_box]["class"]:
+
+                                    self.correct_bbox_top_bottom(image, neighbor, box, neighbor_box)
                                     object = image_json[image][box]["class"]
                                     print("Found a bottom neighbor image.")
                                     print(box + " in " + image + " and " + neighbor_box + " in " + neighbor + " are the same. " +
@@ -291,6 +322,8 @@ class OverlapDetect():
                                 if abs(image_json[image][box]["ymin"] - image_json[neighbor][neighbor_box]["ymin"]) <= left_right_y_thresh and \
                                         abs(image_json[image][box]["ymax"] - image_json[neighbor][neighbor_box]["ymax"]) <= left_right_y_thresh and \
                                         image_json[image][box]["class"] == image_json[neighbor][neighbor_box]["class"]:
+
+                                    self.correct_bbox_left_right(image, neighbor, box, neighbor_box)
                                     object = image_json[image][box]["class"]
                                     print("Found a left neighbor image.")
                                     print(box + " in " + image + " and " + neighbor_box + " in " + neighbor + " are the same. " +
@@ -321,6 +354,8 @@ class OverlapDetect():
                                 if abs(image_json[image][box]["ymin"] - image_json[neighbor][neighbor_box]["ymin"]) <= left_right_y_thresh and \
                                         abs(image_json[image][box]["ymax"] - image_json[neighbor][neighbor_box]["ymax"]) <= left_right_y_thresh and \
                                         image_json[image][box]["class"] == image_json[neighbor][neighbor_box]["class"]:
+
+                                    self.correct_bbox_left_right(image, neighbor, box, neighbor_box)
                                     object = image_json[image][box]["class"]
                                     print("Found a right neighbor image.")
                                     print(box + " in " + image + " and " + neighbor_box + " in " + neighbor + " are the same. " +
@@ -371,7 +406,6 @@ class OverlapDetect():
                                     continue
 
     def find_overlap(self):
-
         # TODO: the statistics for the overlapping objects can be used to calculate the x and y thresholds
         left_right_x_thresh = 10
         left_right_y_thresh = 50
@@ -411,7 +445,7 @@ class OverlapDetect():
         # print("Corner case count: " + str(self.corner_case_count))
         # print("Left right dict: " + str(self.left_right_overlap_dict) + '\n')
         # print("Up down dict: " + str(self.up_down_overlap_dict) + '\n')
-        # self.draw_bbox(self.image_json)
+        self.draw_bbox(self.image_json)
         return int(self.overlap_count / 2) - 3 * self.corner_case_count
 
     def init_json(self):
@@ -481,10 +515,8 @@ if __name__ == "__main__":
     overlap_detect = OverlapDetect([1, 1])
     overlap_detect.init_json()
     overlap_detect.get_coordinates()
-
-    #pp = pprint.PrettyPrinter(depth=3)
-    #pp.pprint(image_json)
-
+    pp = pprint.PrettyPrinter(depth=3)
+    pp.pprint(image_json)
     start = time.time()
     overlap_detect.find_overlap()
     end = time.time()
