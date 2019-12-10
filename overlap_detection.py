@@ -5,12 +5,16 @@ import json
 import pprint
 import time
 import re
+import cv2
 import numpy as np
 from PIL import Image
+import threading
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import NullLocator
 import xml.etree.ElementTree as ET
+
+Image.MAX_IMAGE_PIXELS = 100000000000
 
 class OverlapDetect():
 
@@ -30,7 +34,6 @@ class OverlapDetect():
         self.up_down_overlap_dict = {}
         self.x_offset = tile_offset[0]
         self.y_offset = tile_offset[1]
-
         self.base_coords = []
 
     # find the nth occurrence of a character in a string
@@ -68,7 +71,8 @@ class OverlapDetect():
         y_offset = image_coords[1] - base_coords[1]
         return x_offset, y_offset
 
-    # exports detection json to files with corresponding names
+    # exports detection results for each image into individual files with corresponding names
+    # param {dict} output_json: the json object to be exported
     def export_detection_result(self, output_json):
         output_path = os.path.join(r"D:\PyTorch-YOLOv3-master\output", "detection_output")
 
@@ -112,6 +116,7 @@ class OverlapDetect():
 
         # reference image for doing offset math
         # self.base_coords = self.get_tile_coordinates(images[0])
+        print("base coordinates: " + str(self.base_coords))
 
         image_name = os.path.splitext(image)[0].split('_')[0]
         imgs = [Image.open(i) for i in fullpath_images]
@@ -165,20 +170,20 @@ class OverlapDetect():
         img_merge = img_merge.convert("RGB")
         img_merge.save(os.path.join(output_path, image_name + '_merged.jpg'))
 
-    def draw_bbox(self, image_json):
+    def draw_bbox(self):
         output_path = os.path.join(r'D:\PyTorch-YOLOv3-master\output\samples', 'redrawn_bbox')
 
-        for image in image_json:
+        for image in self.image_json:
             img = np.array(Image.open(os.path.join(self.IMG_PATH, image)))
             plt.figure()
             fig, ax = plt.subplots(1)
             ax.imshow(img)
-            for box in image_json[image]:
+            for box in self.image_json[image]:
                 if "box" in box:
-                    x1 = image_json[image][box]["xmin"]
-                    y1 = image_json[image][box]["ymin"]
-                    box_w = image_json[image][box]["width"]
-                    box_h = image_json[image][box]["height"]
+                    x1 = self.image_json[image][box]["xmin"]
+                    y1 = self.image_json[image][box]["ymin"]
+                    box_w = self.image_json[image][box]["width"]
+                    box_h = self.image_json[image][box]["height"]
 
                     bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor="red", facecolor="none")
                     ax.add_patch(bbox)
@@ -192,6 +197,61 @@ class OverlapDetect():
 
             plt.savefig(os.path.join(output_path, image), bbox_inches="tight", pad_inches=0.0)
             plt.close()
+
+    # draws corrected bounding boxes from detection json files
+    # param {string} json_path: path to the detection json file
+    # param {string} output_path: path to the output image
+    # param {string} output_image: output image for the detection
+    def draw_corrected_bbox(self, json_path, output_path, output_image):
+        os.chdir(json_path)
+        json_datas = []
+
+        # get_json_data_start = time.time()
+        for json_file in glob.glob("*.json"):
+            with open(json_file, 'r') as fp:
+                json_data = json.load(fp)
+                json_datas.append(json_data)
+
+        # get_json_data_end = time.time()
+        img = np.array(Image.open(output_image))
+
+        # draw_box_start = time.time()
+        for image in json_datas:
+            for box in image:
+                if "box" in box:
+                    x1 = image[box]["xmin"]
+                    y1 = image[box]["ymin"]
+                    x2 = image[box]["xmax"]
+                    y2 = image[box]["ymax"]
+                    cls = image[box]["class"]
+                    center_x = (x1 + x2) / 2
+                    center_y = (y1 + y2) / 2
+
+                    # center point
+                    # draw_circle_start = time.time()
+                    cv2.circle(img, (int(center_x), int(center_y)), 5, (0, 0, 255), 5)
+                    # draw_circle_end = time.time()
+
+                    # cv2.putText(img, cls, (int(center_x), int(center_y)), cv2.FONT_HERSHEY_SIMPLEX, \
+                    #             1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+
+                    # draw bounding box
+                    # cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 255, 255), 2)
+                    # cv2.putText(img, cls, (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, \
+                    #             1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+
+                    # imwrite_start = time.time()
+                    #x = threading.Thread(target=cv2.imwrite, args=(os.path.join(output_path, os.path.basename(output_image)), img))
+                    cv2.imwrite(os.path.join(output_path, os.path.basename(output_image)), img)
+                    #x.start()
+                    # imwrite_end = time.time()
+
+                    # print("Draw circle duration: " + str(draw_circle_end - draw_circle_start))
+                    # print("imwrite duration: " + str(imwrite_end - imwrite_start))
+
+        # draw_box_end = time.time()
+        # print("Get json data duration: " + str(get_json_data_end - get_json_data_start) + "s.")
+        # print("Draw boxes duration: " + str(draw_box_end - draw_box_start) + "s.")
 
     # get the tile coordinates of target image
     # param {string} filename: name of the target file
@@ -298,11 +358,21 @@ class OverlapDetect():
         if image_bbox_length > neighbor_bbox_length:
             self.image_json[neighbor][neighbor_box]["xmin"] = self.image_json[image][box]["xmin"]
             self.image_json[neighbor][neighbor_box]["xmax"] = self.image_json[image][box]["xmax"]
-            self.image_json[neighbor][neighbor_bos]["width"] = self.image_json[image][box]["width"]
+            self.image_json[neighbor][neighbor_box]["width"] = self.image_json[image][box]["width"]
+
+            # self.image_json[image][box]["xmax"] = self.image_json[neighbor][neighbor_box]["xmax"]
+            # self.image_json[image][box]["ymax"] = self.image_json[neighbor][neighbor_box]["ymax"]
+            # self.image_json[image][box]["height"] += self.image_json[neighbor][neighbor_box]["height"]
+            # del self.image_json[neighbor]
         else:
             self.image_json[image][box]["xmin"] = self.image_json[neighbor][neighbor_box]["xmin"]
             self.image_json[image][box]["xmax"] = self.image_json[neighbor][neighbor_box]["xmax"]
             self.image_json[image][box]["width"] = self.image_json[neighbor][neighbor_box]["width"]
+
+            # self.image_json[neighbor][neighbor_box]["xmax"] = self.image_json[image][box]["xmax"]
+            # self.image_json[neighbor][neighbor_box]["ymax"] = self.image_json[image][box]["ymax"]
+            # self.image_json[neighbor][neighbor_box]["height"] += self.image_json[image][box]["height"]
+            # del self.image_json[neighbor]
 
     # looks at two mismatched neighbor boxes and takes the one with the higher height as the height
     # param {string} image: name of the target image
@@ -317,10 +387,20 @@ class OverlapDetect():
             self.image_json[neighbor][neighbor_box]["ymin"] = self.image_json[image][box]["ymin"]
             self.image_json[neighbor][neighbor_box]["ymax"] = self.image_json[image][box]["ymax"]
             self.image_json[neighbor][neighbor_box]["height"] = self.image_json[image][box]["height"]
+
+            # self.image_json[image][box]["xmax"] = self.image_json[neighbor][neighbor_box]["xmax"]
+            # self.image_json[image][box]["ymax"] = self.image_json[neighbor][neighbor_box]["ymax"]
+            # self.image_json[image][box]["width"] += self.image_json[neighbor][neighbor_box]["width"]
+            # del self.image_json[neighbor]
         else:
             self.image_json[image][box]["ymin"] = self.image_json[neighbor][neighbor_box]["ymin"]
             self.image_json[image][box]["ymax"] = self.image_json[neighbor][neighbor_box]["ymax"]
             self.image_json[image][box]["height"] = self.image_json[neighbor][neighbor_box]["height"]
+
+            # self.image_json[neighbor][neighbor_box]["xmax"] = self.image_json[image][box]["xmax"]
+            # self.image_json[neighbor][neighbor_box]["ymax"] = self.image_json[image][box]["ymax"]
+            # self.image_json[neighbor][neighbor_box]["width"] += self.image_json[image][box]["width"]
+            # del self.image_json[neighbor]
 
     def top_overlap(self, image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh):
         for box in image_json[image]:
@@ -485,7 +565,7 @@ class OverlapDetect():
     # returns {int}: returns the number of overlapping bounding boxes
     def find_overlap(self):
 
-        self.get_reference_image(r'D:\PyTorch-YOLOv3-master\output\samples\redrawn_bbox')
+        self.get_reference_image(r'D:\PyTorch-YOLOv3-master\data\samples')
 
         # TODO: the statistics for the overlapping objects can be used to calculate the x and y thresholds
         left_right_x_thresh = 10
@@ -505,11 +585,11 @@ class OverlapDetect():
                 if neighbor_type == "right":
                     self.right_overlap(self.image_json, image, neighbor, left_right_x_thresh, left_right_y_thresh)
 
-                elif neighbor_type == "left":
-                    self.left_overlap(self.image_json, image, neighbor, left_right_x_thresh, left_right_y_thresh)
+                # elif neighbor_type == "left":
+                #     self.left_overlap(self.image_json, image, neighbor, left_right_x_thresh, left_right_y_thresh)
 
-                elif neighbor_type == "top":
-                    self.top_overlap(self.image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh)
+                # elif neighbor_type == "top":
+                #     self.top_overlap(self.image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh)
 
                 elif neighbor_type == "bottom":
                     self.bottom_overlap(self.image_json, image, neighbor, up_down_x_thresh, up_down_y_thresh)
@@ -525,7 +605,7 @@ class OverlapDetect():
         # print("Corner case count: " + str(self.corner_case_count))
         # print("Left right dict: " + str(self.left_right_overlap_dict) + '\n')
         # print("Up down dict: " + str(self.up_down_overlap_dict) + '\n')
-        self.draw_bbox(self.image_json)
+        # self.draw_bbox()
         return int(self.overlap_count / 2) - 3 * self.corner_case_count
 
     def init_json(self):

@@ -143,8 +143,8 @@ if __name__ == "__main__":
             bbox_colors = random.sample(colors, n_cls_preds)
             box_idx = 0
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-                if classes[int(cls_pred)] == "palm0":
-                # if True:
+                # if classes[int(cls_pred)] == "palm0":
+                if True:
                     print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
 
                     if x1 < 0:
@@ -195,23 +195,42 @@ if __name__ == "__main__":
                     cv2.imwrite(f"output/samples/{os.path.basename(path)[:-4]}.png", img)
                     cv2.putText(img, classes[int(cls_pred)], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, \
                                 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
-                    cv2.putText(img, os.path.basename(path), (0, int(im.height / 2)), \
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+                    # cv2.putText(img, os.path.basename(path), (0, int(im.height / 2)), \
+                    #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
                     box_count += 1
 
     print("Total inference time: " + str(total_time - start_time))
     with open("image_json.json", "w") as img_json:
         json.dump(image_json, img_json, indent=4)
 
-    print("Image json: " + str(image_json))
-
     overlap_detect = overlap_detection.OverlapDetect([500, 500], image_json)
-    start = time.time()
+
+    find_overlap_start = time.time()
     overlap_count = overlap_detect.find_overlap()
-    # overlap_detect.merge_detections(r"D:\PyTorch-YOLOv3-master\output\samples\redrawn_bbox", r"D:\PyTorch-YOLOv3-master\output")
+    find_overlap_end = time.time()
+
+    merge_detections_start = time.time()
+    overlap_detect.merge_detections(r"D:\PyTorch-YOLOv3-master\data\samples", r"D:\PyTorch-YOLOv3-master\output")
+    merge_detections_end = time.time()
+
+    add_offset_start = time.time()
     detection_json = overlap_detect.add_offset_to_bbox_coords()
+    add_offset_end = time.time()
+
+    export_detection_start = time.time()
     overlap_detect.export_detection_result(detection_json)
-    end = time.time()
+    export_detection_end = time.time()
+
+    # draw_corrected_bbox_start = time.time()
+    # overlap_detect.draw_corrected_bbox(r'D:\PyTorch-YOLOv3-master\output\detection_output\\',
+    #                                    r'D:\PyTorch-YOLOv3-master\output\detection_output\\',
+    #                                    r'D:\PyTorch-YOLOv3-master\output\tile_merged.jpg')
+    # draw_corrected_bbox_end = time.time()
 
     print("Number of trees detected: " + str(box_count - overlap_count))
-    print("Time elapsed for overlap detection: " + str(end - start) + " seconds.")
+
+    print("find_overlap(): " + str(find_overlap_end - find_overlap_start) + "s.")
+    print("merge_detections(): " + str(merge_detections_end - merge_detections_start) + "s.")
+    print("add_offset(): " + str(add_offset_end - add_offset_start) + "s.")
+    print("export_detection_result(): " + str(export_detection_end - export_detection_start) + "s.")
+    # print("draw_corrected_bbox(): " + str(draw_corrected_bbox_end - draw_corrected_bbox_start) + "s.")
