@@ -19,13 +19,19 @@ def pyramid(image, scale=1.5, minSize=(30, 30)):
         # yield the next image in the pyramid
         yield image
 
-def sliding_window(image, stepSize, windowSize):
-    print("Stepsize: " + str(stepSize))
+def sliding_window(image, x_stepSize, y_stepSize, windowSize):
+    print("x_Stepsize: " + str(x_stepSize))
+    print("y_Stepsize: " + str(y_stepSize))
     print("window width: " + str(windowSize[0]))
     print("window height: " + str(windowSize[1]))
-    for y in range(0, image.shape[0], windowSize[1] - stepSize):
-        if image.shape[0] - y < windowSize[1]:
-            windowSize[1] = image.shape[0] - y
-            print("New windowsize: " + str(windowSize[1]))
-        for x in range(0, image.shape[1], stepSize):
+    original_windowSizeX = windowSize[0]
+    for y in range(0, image.shape[0], windowSize[1] - y_stepSize):
+        # windowSize[0] = original_windowSizeX
+        # if y + windowSize[1] > image.shape[1]:
+        #     windowSize[1] = image.shape[1] - y
+        #     # print("New y_windowsize: " + str(windowSize[1]))
+        for x in range(0, image.shape[1], x_stepSize):
+            # if x + windowSize[0] > image.shape[0]:
+            #     windowSize[0] = image.shape[0] - x
+            # # print("New x_windowsize: " + str(windowSize[0]))
             yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])

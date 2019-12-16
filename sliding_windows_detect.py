@@ -63,10 +63,11 @@ if __name__ == "__main__":
     parser.add_argument("--conf_thres", type=float, default=0.8, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.4, help="iou threshold for non-maximum suppression")
     parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
-    parser.add_argument("--img_size", type=int, default=500, help="size of each image dimension")
+    parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
     parser.add_argument("--n_cpu", type=int, default=0, help="number of cpu threads to use during batch generation")
     parser.add_argument("--checkpoint_model", type=str, help="path to checkpoint model")
-    parser.add_argument("--stride", type=int, default=50, help="stride of the sliding window in pixels")
+    parser.add_argument("--x_stride", type=int, default=200, help="width stride of the sliding window in pixels")
+    parser.add_argument("--y_stride", type=int, default=200, help="height stride of the sliding window in pixels")
     parser.add_argument("--image", type=str, default='output/tile_merged.jpg',
                         help="the image to apply sliding windows on")
     opt = parser.parse_args()
@@ -90,26 +91,32 @@ if __name__ == "__main__":
 
     im = Image.open(opt.image)
     image_width, image_height = im.size
-    (winW, winH) = (500, 500)
+
+    x_divide = image_width / 500
+    y_divide = image_height / 500
+
+    # [winW, winH] = [int(image_width / 4), int(image_height / 4)]
+    [winW, winH] = [500, 500]
+    opt.x_stride = int(winW / 2)
+    opt.y_stride = int(winH / 2)
     image = cv2.imread(opt.image)
 
     cv2.namedWindow("output", cv2.WINDOW_NORMAL)
-    image_resized = cv2.resize(image, (1280, 1024))
-
     bbox_color = 'red'
     output_path = r'D:\PyTorch-YOLOv3-master\sliding_windows_output'
     box_idx = 0
 
-    for (x, y, window) in sliding_window(image_resized, stepSize=opt.stride, windowSize=(winW, winH)):
-
-        if window.shape[0] != winH or window.shape[1] != winW:
-            continue
+    for (x, y, window) in sliding_window(image, x_stepSize=opt.x_stride, y_stepSize=opt.y_stride,
+                                         windowSize=[winW, winH]):
+        # if window.shape[0] != winH or window.shape[1] != winW:
+        #     continue
 
         # THIS IS WHERE YOU WOULD PROCESS YOUR WINDOW, SUCH AS APPLYING A
         # MACHINE LEARNING CLASSIFIER TO CLASSIFY THE CONTENTS OF THE
         # WINDOW
 
         detections = detect_image(window, model)
+
         if detections is not None:
             detections = rescale_boxes(detections, opt.img_size, window.shape[:2])
             unique_labels = detections[:, -1].cpu().unique()
@@ -139,15 +146,19 @@ if __name__ == "__main__":
                 # print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
                 # print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
-                cv2.rectangle(image_resized, (x + x1, y + y1), (x + x2, y + y2), (0, 0, 255), 2)
+                if classes[int(cls_pred)] != "palm0":
+                    cv2.rectangle(image, (x + x1, y + y1), (x + x2, y + y2), (0, 0, 255), 2)
+                    cv2.putText(image, classes[int(cls_pred)], (int(x + x1), int(y + y1)), \
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), lineType=cv2.LINE_AA)
 
-        cv2.rectangle(image_resized, (x, y), (x + winW, y + winH), (0, 255, 0), 2)
-        cv2.imshow("Window", image_resized)
+        # cv2.rectangle(image, (x, y), (x + winW, y + winH), (0, 255, 0), 2)
+        cv2.imshow("Window", image)
 
-        cv2.imwrite(os.path.join(output_path, "picture_" + str(box_idx) + ".jpeg"), image_resized)
+        # cv2.imwrite(os.path.join(output_path, "picture_" + str(box_idx) + ".jpeg"), image)
         box_idx += 1
-        image = cv2.imread(opt.image)
-        image_resized = cv2.resize(image, (1280, 1024))
+        # image = cv2.imread(opt.image)
         cv2.waitKey(1)
-        time.sleep(0.1)
+        # time.sleep(0.1)
+
+    cv2.imwrite(os.path.join(output_path, "combined.jpeg"), image)
 
