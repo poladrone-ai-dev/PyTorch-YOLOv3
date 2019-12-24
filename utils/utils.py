@@ -231,21 +231,28 @@ def non_max_suppression(prediction, conf_thres=0.5, nms_thres=0.4):
         (x1, y1, x2, y2, object_conf, class_score, class_pred)
     """
 
+    # nms prediction shape: [1, 10647, 9] - only the last 9 matters. have to squeeze it from [1, 9] to [1, 7]
+    # for detection to work
+
     # From (center x, center y, width, height) to (x1, y1, x2, y2)
     prediction[..., :4] = xywh2xyxy(prediction[..., :4])
     output = [None for _ in range(len(prediction))]
     for image_i, image_pred in enumerate(prediction):
-        # Filter out confidence scores below threshold
+        # Filter out confidence scores below threshold - reduces # of candidate boxes from 10k to 2 digits
         image_pred = image_pred[image_pred[:, 4] >= conf_thres]
+
         # If none are remaining => process next image
         if not image_pred.size(0):
             continue
+
         # Object confidence times class confidence
         score = image_pred[:, 4] * image_pred[:, 5:].max(1)[0]
         # Sort by it
         image_pred = image_pred[(-score).argsort()]
+
         class_confs, class_preds = image_pred[:, 5:].max(1, keepdim=True)
         detections = torch.cat((image_pred[:, :5], class_confs.float(), class_preds.float()), 1)
+
         # Perform non-maximum suppression
         keep_boxes = []
         while detections.size(0):

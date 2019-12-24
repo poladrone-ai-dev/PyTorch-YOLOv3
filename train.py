@@ -100,7 +100,6 @@ if __name__ == "__main__":
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=opt.batch_size,
-        # batch_size= int(int(model.hyperparams['batch']) / int(model.hyperparams['subdivisions'])),
         shuffle=True,
         num_workers=opt.n_cpu,
         pin_memory=True,
@@ -114,12 +113,6 @@ if __name__ == "__main__":
 
     initial_learning_rate = model.hyperparams['learning_rate']
     initial_decay = model.hyperparams['decay']
-
-    # scheduler_cosine = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, opt.epochs)
-    # lambda1 = lambda epoch: 1
-    # lambda2 = lambda epoch: 0.95 * 1
-    # scheduler_lambda = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
-    # scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=8, total_epoch=2, after_scheduler=scheduler_lambda)
 
     metrics = [
         "grid_size",
@@ -279,6 +272,7 @@ if __name__ == "__main__":
 
         if epoch % opt.checkpoint_interval == 0:
             torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
+            # torch.save(model, f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
 
 
     with open("runtime.txt", 'a') as fp:

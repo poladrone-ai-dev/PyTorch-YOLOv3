@@ -229,16 +229,16 @@ class OverlapDetect():
 
                     # center point
                     # draw_circle_start = time.time()
-                    cv2.circle(img, (int(center_x), int(center_y)), 5, (0, 0, 255), 5)
+                    # cv2.circle(img, (int(center_x), int(center_y)), 5, (0, 0, 255), 5)
                     # draw_circle_end = time.time()
 
                     # cv2.putText(img, cls, (int(center_x), int(center_y)), cv2.FONT_HERSHEY_SIMPLEX, \
                     #             1.0, (0, 0, 0), lineType=cv2.LINE_AA)
 
                     # draw bounding box
-                    # cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 255, 255), 2)
-                    # cv2.putText(img, cls, (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, \
-                    #             1.0, (0, 0, 0), lineType=cv2.LINE_AA)
+                    cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 255, 255), 2)
+                    cv2.putText(img, cls, (int(x1), int(y1)), cv2.FONT_HERSHEY_SIMPLEX, \
+                                1.0, (0, 0, 0), lineType=cv2.LINE_AA)
 
                     # imwrite_start = time.time()
                     #x = threading.Thread(target=cv2.imwrite, args=(os.path.join(output_path, os.path.basename(output_image)), img))

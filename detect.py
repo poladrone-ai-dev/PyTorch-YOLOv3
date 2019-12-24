@@ -46,7 +46,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_folder", type=str, default="data/samples", help="path to dataset")
     parser.add_argument("--model_def", type=str, default="config/yolov3-custom.cfg", help="path to model definition file")
-    parser.add_argument("--weights_path", type=str, default="checkpoints_latest_3rd_Dec_2019/yolov3_ckpt_251.pth", help="path to weights file")
+    # parser.add_argument("--weights_path", type=str, default="checkpoints_27th/yolov3_ckpt_250.pth", \
+    #                     help="path to weights file")
+    parser.add_argument("--weights_path", type=str, default="checkpoints_latest_3rd_Dec_2019/yolov3_ckpt_251.pth", \
+                                            help="path to weights file")
     parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
     parser.add_argument("--conf_thres", type=float, default=0.8, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.4, help="iou threshold for non-maximum suppression")
@@ -94,6 +97,8 @@ if __name__ == "__main__":
     prev_time = time.time()
     start_time = time.time()
 
+
+
     for batch_i, (img_paths, input_imgs) in enumerate(dataloader):
         # Configure input
         input_imgs = Variable(input_imgs.type(Tensor))
@@ -138,13 +143,14 @@ if __name__ == "__main__":
         if detections is not None:
             # Rescale boxes to original image
             detections = rescale_boxes(detections, opt.img_size, img.shape[:2])
+
             unique_labels = detections[:, -1].cpu().unique()
             n_cls_preds = len(unique_labels)
             bbox_colors = random.sample(colors, n_cls_preds)
             box_idx = 0
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-                # if classes[int(cls_pred)] == "palm0":
-                if True:
+                if classes[int(cls_pred)] != "palm0":
+                # if True:
                     print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
 
                     if x1 < 0:
@@ -223,12 +229,11 @@ if __name__ == "__main__":
 
     # draw_corrected_bbox_start = time.time()
     # overlap_detect.draw_corrected_bbox(r'D:\PyTorch-YOLOv3-master\output\detection_output\\',
-    #                                    r'D:\PyTorch-YOLOv3-master\output\detection_output\\',
+    #                                    r'D:\PyTorch-YOLOv3-master\output\\',
     #                                    r'D:\PyTorch-YOLOv3-master\output\tile_merged.jpg')
     # draw_corrected_bbox_end = time.time()
 
     print("Number of trees detected: " + str(box_count - overlap_count))
-
     print("find_overlap(): " + str(find_overlap_end - find_overlap_start) + "s.")
     print("merge_detections(): " + str(merge_detections_end - merge_detections_start) + "s.")
     print("add_offset(): " + str(add_offset_end - add_offset_start) + "s.")
