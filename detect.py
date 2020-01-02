@@ -46,9 +46,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_folder", type=str, default="data/samples", help="path to dataset")
     parser.add_argument("--model_def", type=str, default="config/yolov3-custom.cfg", help="path to model definition file")
-    # parser.add_argument("--weights_path", type=str, default="checkpoints_27th/yolov3_ckpt_250.pth", \
-    #                     help="path to weights file")
-    parser.add_argument("--weights_path", type=str, default="checkpoints_latest_3rd_Dec_2019/yolov3_ckpt_251.pth", \
+    parser.add_argument("--weights_path", type=str, default="checkpoints/yolov3_ckpt_251.pth", \
                                             help="path to weights file")
     parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
     parser.add_argument("--conf_thres", type=float, default=0.8, help="object confidence threshold")
@@ -61,7 +59,6 @@ if __name__ == "__main__":
     print(opt)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     os.makedirs("output", exist_ok=True)
 
     # Set up model
@@ -72,7 +69,7 @@ if __name__ == "__main__":
         model.load_darknet_weights(opt.weights_path)
     else:
         # Load checkpoint weights
-        model.load_state_dict(torch.load(opt.weights_path))
+        model.load_state_dict(torch.load(opt.weights_path, map_location=torch.device('cpu')))
 
     model.eval()  # Set in evaluation mode
 
@@ -96,8 +93,6 @@ if __name__ == "__main__":
     print("\nPerforming object detection:")
     prev_time = time.time()
     start_time = time.time()
-
-
 
     for batch_i, (img_paths, input_imgs) in enumerate(dataloader):
         # Configure input
@@ -216,7 +211,7 @@ if __name__ == "__main__":
     find_overlap_end = time.time()
 
     merge_detections_start = time.time()
-    overlap_detect.merge_detections(r"D:\PyTorch-YOLOv3-master\data\samples", r"D:\PyTorch-YOLOv3-master\output")
+    overlap_detect.merge_detections(r"C:\Users\brian\PyTorch-YOLOv3\data\samples", r"C:\Users\brian\PyTorch-YOLOv3\output")
     merge_detections_end = time.time()
 
     add_offset_start = time.time()

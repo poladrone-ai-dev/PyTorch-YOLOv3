@@ -19,7 +19,7 @@ Image.MAX_IMAGE_PIXELS = 100000000000
 class OverlapDetect():
 
     def __init__(self, tile_offset, image_json = None, image_path=None, xml_path=None):
-        self.IMG_PATH = r'D:\PyTorch-YOLOv3-master\data\samples'
+        self.IMG_PATH = r'C:\Users\brian\PyTorch-YOLOv3\data\samples'
         self.XML_PATH = r'D:\image_processing\output\tree_annotation'
 
         if image_json == None:
@@ -74,7 +74,7 @@ class OverlapDetect():
     # exports detection results for each image into individual files with corresponding names
     # param {dict} output_json: the json object to be exported
     def export_detection_result(self, output_json):
-        output_path = os.path.join(r"D:\PyTorch-YOLOv3-master\output", "detection_output")
+        output_path = os.path.join(r"C:\Users\brian\PyTorch-YOLOv3\output", "detection_output")
 
         if not os.path.isdir(output_path):
             os.mkdir(output_path)
@@ -171,7 +171,7 @@ class OverlapDetect():
         img_merge.save(os.path.join(output_path, image_name + '_merged.jpg'))
 
     def draw_bbox(self):
-        output_path = os.path.join(r'D:\PyTorch-YOLOv3-master\output\samples', 'redrawn_bbox')
+        output_path = os.path.join(r'C:\Users\brian\PyTorch-YOLOv3\output\samples', 'redrawn_bbox')
 
         for image in self.image_json:
             img = np.array(Image.open(os.path.join(self.IMG_PATH, image)))
@@ -565,7 +565,7 @@ class OverlapDetect():
     # returns {int}: returns the number of overlapping bounding boxes
     def find_overlap(self):
 
-        self.get_reference_image(r'D:\PyTorch-YOLOv3-master\data\samples')
+        self.get_reference_image(r'C:\Users\brian\PyTorch-YOLOv3\data\samples')
 
         # TODO: the statistics for the overlapping objects can be used to calculate the x and y thresholds
         left_right_x_thresh = 10
