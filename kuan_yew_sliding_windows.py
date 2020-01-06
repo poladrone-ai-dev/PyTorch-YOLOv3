@@ -122,6 +122,7 @@ def filter_bounding_boxes(output_json):
 
     print("Deleted boxes: " + str(deleted_boxes))
     print("Number of deleted boxes: " + str(len(deleted_boxes)))
+
     # delete the filtered boxes
     for box in filtered_json:
         if box in deleted_boxes:
@@ -132,12 +133,20 @@ def filter_bounding_boxes(output_json):
 
 def calculate_box_offset(output_json, window, box, window_dim, image_dim):
     coords = get_tile_coordinates(window)
+
+    # if coords[1] * opt.x_stride <= (global_var.max_x - 1) * opt.x_stride and \
+    #         coords[0] * opt.y_stride <= (global_var.max_y - 1) * opt.x_stride:
     output_json[box]["x1"] += coords[1] * opt.x_stride
     output_json[box]["x2"] += coords[1] * opt.x_stride
     output_json[box]["center_x"] += coords[1] * opt.x_stride
+    output_json[box]["x_offset"] = coords[1] * opt.x_stride
+    print("calculate x_offset: " + str(coords[1] * opt.x_stride))
+
     output_json[box]["y1"] += coords[0] * opt.y_stride
     output_json[box]["y2"] += coords[0] * opt.y_stride
     output_json[box]["center_y"] += coords[0] * opt.y_stride
+    output_json[box]["y_offset"] = coords[0] * opt.y_stride
+    print("calculate y_offset: " + str(coords[0] * opt.y_stride))
 
     # output_json[box]["x1"] = global_var.x_offset
     # output_json[box]["x2"] = global_var.x_offset
@@ -147,7 +156,7 @@ def calculate_box_offset(output_json, window, box, window_dim, image_dim):
     # output_json[box]["center_y"] = global_var.y_offset
 
 def draw_bounding_boxes(output_json, image, window_dim):
-
+    image_height, image_width, channel = image.shape
     for box in output_json:
         x1 = output_json[box]["x1"]
         y1 = output_json[box]["y1"]
@@ -157,10 +166,22 @@ def draw_bounding_boxes(output_json, image, window_dim):
         center_y = output_json[box]["center_y"]
         cls_pred = output_json[box]["cls_pred"]
 
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 2)
-        # cv2.circle(image, (center_x, center_y), 10, (0, 0, 255), 5)
-        cv2.putText(image, box, (int(x1), int(y1)), \
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 5, lineType=cv2.LINE_AA)
+        if x1 < torch.tensor(1):
+            x1 = torch.tensor(1)
+
+        if y1 < torch.tensor(1):
+            y1 = torch.tensor(1)
+
+        if x2 > torch.tensor(image_width - 1):
+            x2 = torch.tensor(image_width - 1)
+
+        if y2 > torch.tensor(image_height - 1):
+            y2 = torch.tensor(image_height - 1)
+
+        # cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        cv2.circle(image, (center_x, center_y), 10, (0, 0, 255), 5)
+        # cv2.putText(image, box, (int(x1), int(y1)), \
+        #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 5, lineType=cv2.LINE_AA)
 
 def sliding_windows(window_dim):
     image = cv2.imread(opt.image)
@@ -185,40 +206,40 @@ def sliding_windows(window_dim):
         window_width, window_height = window_image.size
         window_image.save(os.path.join(r'sliding_windows_output\sliding_windows', window_name + ".jpg"))
 
-        global_var.x_offset += winW - opt.x_stride
-        print("X_offset: " + str(global_var.x_offset))
-        print("Y_offset: " + str(global_var.y_offset))
-
-        if global_var.x_coord == 0 and global_var.y_coord != 0:
-            global_var.x_offset = 0
-            global_var.y_offset += opt.y_stride
-            print("X_offset: " + str(global_var.x_offset))
-            print("Y_offset: " + str(global_var.y_offset))
+        # global_var.x_offset += winW - opt.x_stride
+        # print("X_offset: " + str(global_var.x_offset))
+        # print("Y_offset: " + str(global_var.y_offset))
+        #
+        # if global_var.x_coord == 0 and global_var.y_coord != 0:
+        #     global_var.x_offset = 0
+        #     global_var.y_offset += opt.y_stride
+        #     print("X_offset: " + str(global_var.x_offset))
+        #     print("Y_offset: " + str(global_var.y_offset))
 
         print("Performing detection on " + window_name + ".")
         detections = detect_image(window, model)
 
         if window_width != winW or window_height != winH:
-            global_var.x_offset += global_var.y_coord * window_width
-            print("X_offset: " + str(global_var.x_offset))
-            print("Y_offset: " + str(global_var.y_offset))
+            # global_var.x_offset += global_var.y_coord * window_width
+            # print("X_offset: " + str(global_var.x_offset))
+            # print("Y_offset: " + str(global_var.y_offset))
             print("Non-square detection window detected. Window dimension: (" + str(window_width) + ", " + str(window_height) + ")")
 
         if detections is not None:
             detections = rescale_boxes(detections, opt.img_size, window.shape[:2])
 
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-                if x1 < torch.tensor(0):
-                    x1 = torch.tensor(0)
+                if x1 < torch.tensor(1):
+                    x1 = torch.tensor(1)
 
-                if y1 < torch.tensor(0):
-                    y1 = torch.tensor(0)
+                if y1 < torch.tensor(1):
+                    y1 = torch.tensor(1)
 
-                if x2 > torch.tensor(image_width):
-                    x2 = torch.tensor(image_width)
+                if x2 > torch.tensor(image_width - 1):
+                    x2 = torch.tensor(image_width - 1)
 
-                if y2 > torch.tensor(image_height):
-                    y2 = torch.tensor(image_height)
+                if y2 > torch.tensor(image_height - 1):
+                    y2 = torch.tensor(image_height - 1)
 
                 if classes[int(cls_pred)] != "palm0":
                     box_name = "box" + str(box_idx)
@@ -234,6 +255,10 @@ def sliding_windows(window_dim):
                                 "y1": round(y1.item()),
                                 "x2": round(x2.item()),
                                 "y2": round(y2.item()),
+                                "x1_og": round(x1.item()),
+                                "y1_og": round(y1.item()),
+                                "x2_og": round(x2.item()),
+                                "y2_og": round(y2.item()),
                                 "width": round(box_w.item()),
                                 "height": round(box_h.item()),
                                 "center_x": round(center_x),
@@ -257,10 +282,9 @@ def sliding_windows(window_dim):
         window_idx += 1
         # image = cv2.imread(opt.image)
         cv2.waitKey(1)
-        # time.sleep(0.1)
 
-    output_json = filter_bounding_boxes(output_json)
-    draw_bounding_boxes(output_json, image, window_dim)
+    # output_json = filter_bounding_boxes(output_json)
+    # draw_bounding_boxes(output_json, image, window_dim)
 
     fp.close()
     cv2.imwrite(os.path.join(output_path, "combined.jpeg"), image)
@@ -427,18 +451,27 @@ if __name__ == "__main__":
         dataloader([winW, winH])
         global_var.x_offset = -winW
         global_var.y_offset = -winH
+
     else:
         [winW, winH] = [500, 500]
         opt.x_stride = int(winW / 2)
         opt.y_stride = int(winH / 2)
+
+        global_var.max_x = (image_width / opt.x_stride) - 1
+        global_var.max_y = (image_height / opt.y_stride) - 1
+
         sliding_windows([winW, winH])
 
-        # testing section
-        # with open(r'C:\Users\brian\PyTorch-YOLOv3\sliding_windows_output\detection.json') as json_file:
-        #     input_json = json.load(json_file)
-        #
-        # input_json = filter_bounding_boxes(input_json)
-        # image = cv2.imread(opt.image)
-        # draw_bounding_boxes(input_json, image, [winW, winH])
-        # output_path = r'C:\Users\brian\PyTorch-YOLOv3\sliding_windows_output'
-        # cv2.imwrite(os.path.join(output_path, "combined.jpeg"), image)
+        output_path = r'C:\Users\brian\PyTorch-YOLOv3\sliding_windows_output'
+
+        with open(os.path.join(output_path, 'detection.json')) as json_file:
+            input_json = json.load(json_file)
+
+        input_json = filter_bounding_boxes(input_json)
+        with open(os.path.join(output_path, "detection_filtered.json"), "w") as img_json:
+            json.dump(input_json, img_json, indent=4)
+
+        image = cv2.imread(opt.image)
+        draw_bounding_boxes(input_json, image, [winW, winH])
+
+        cv2.imwrite(os.path.join(output_path, "combined.jpeg"), image)
