@@ -1,5 +1,6 @@
 # import the necessary packages
 import imutils
+import pyimagesearch.global_var as global_var
 
 def pyramid(image, scale=1.5, minSize=(30, 30)):
     # yield the original image
@@ -20,18 +21,31 @@ def pyramid(image, scale=1.5, minSize=(30, 30)):
         yield image
 
 def sliding_window(image, x_stepSize, y_stepSize, windowSize):
-    # print("x_Stepsize: " + str(x_stepSize))
-    # print("y_Stepsize: " + str(y_stepSize))
-    # print("window width: " + str(windowSize[0]))
-    # print("window height: " + str(windowSize[1]))
-    original_windowSizeX = windowSize[0]
-    for y in range(0, image.shape[0], windowSize[1] - y_stepSize):
-        # windowSize[0] = original_windowSizeX
-        # if y + windowSize[1] > image.shape[1]:
-        #     windowSize[1] = image.shape[1] - y
-        #     # print("New y_windowsize: " + str(windowSize[1]))
+
+    for y in range(0, image.shape[0], windowSize[0] - y_stepSize):
+        global_var.next_row = False
         for x in range(0, image.shape[1], x_stepSize):
-            # if x + windowSize[0] > image.shape[0]:
-            #     windowSize[0] = image.shape[0] - x
-            # # print("New x_windowsize: " + str(windowSize[0]))
-            yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
+            global_var.y_coord += 1
+            print("x_coord: " + str(global_var.x_coord))
+            print("y_coord: " + str(global_var.y_coord))
+
+            # last_window = (global_var.y_coord == global_var.max_x and global_var.x_coord == global_var.max_y)
+            if y + windowSize[0] > image.shape[0]:
+                new_x = image.shape[0] - windowSize[0]
+                if global_var.x_coord < global_var.max_y:
+                    yield (new_x, y, image[new_x:image.shape[0], x:x + windowSize[0]])
+
+            elif x + windowSize[1] > image.shape[1]:
+                new_y = image.shape[1] - windowSize[1]
+                if global_var.y_coord < global_var.max_x:
+                    yield (x, new_y, image[y:y + windowSize[1], new_y:image.shape[1]])
+
+            else:
+                if global_var.y_coord < global_var.max_x:
+                    yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
+
+            # yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
+
+        global_var.next_row = True
+        global_var.y_coord = -1
+        global_var.x_coord += 1
