@@ -19,7 +19,7 @@ Image.MAX_IMAGE_PIXELS = 100000000000
 class OverlapDetect():
 
     def __init__(self, tile_offset, image_json = None, image_path=None, xml_path=None):
-        self.IMG_PATH = r'C:\Users\brian\PyTorch-YOLOv3\data\samples'
+        self.IMG_PATH = r'D:\PyTorch-YOLOv3-master\data\samples'
         self.XML_PATH = r'D:\image_processing\output\tree_annotation'
 
         if image_json == None:
@@ -74,7 +74,7 @@ class OverlapDetect():
     # exports detection results for each image into individual files with corresponding names
     # param {dict} output_json: the json object to be exported
     def export_detection_result(self, output_json):
-        output_path = os.path.join(r"C:\Users\brian\PyTorch-YOLOv3\output", "detection_output")
+        output_path = os.path.join(r"D:\PyTorch-YOLOv3-master\output", "detection_output")
 
         if not os.path.isdir(output_path):
             os.mkdir(output_path)
@@ -100,6 +100,26 @@ class OverlapDetect():
 
         return output_json
 
+    def sort_image_array(self, image_names):
+        image_coords = []
+        sorted_image_names = []
+        for image_name in image_names:
+            image_coord = self.get_tile_coordinates(os.path.basename(image_name))
+            image_coords.append(image_coord)
+
+        image_coords = sorted(image_coords, key=lambda x: x[1])
+        image_coords = sorted(image_coords, key=lambda x: x[0])
+
+        underscore_count = len(re.findall('_', image_names[0]))
+        first_underscore = self.find_nth(image_names[0], '_', underscore_count - 1)
+        image_basename = image_names[0][:first_underscore]
+        image_ext = os.path.splitext(image_names[0])[1]
+
+        for image_coord in image_coords:
+            sorted_image_names.append(image_basename + "_" + str(image_coord[0]) + "_" + str(image_coord[1]) + image_ext)
+
+        return sorted_image_names
+
     # merges output detection pictures into one larger picture, using the image names for position indexing
     # param {string} image_path: path that contains the input images
     # param {string} output_path: path to store the merged image
@@ -112,10 +132,15 @@ class OverlapDetect():
         for image in glob.glob("*"):
             if os.path.splitext(image)[1] in image_types:
                 images.append(image)
-                fullpath_images.append(os.path.join(image_path, image))
+                # fullpath_images.append(os.path.join(image_path, image))
+
+        images = self.sort_image_array(images)
+
+        for image in images:
+            fullpath_images.append(os.path.join(image_path, image))
 
         # reference image for doing offset math
-        # self.base_coords = self.get_tile_coordinates(images[0])
+        self.base_coords = self.get_tile_coordinates(os.path.basename(images[0]))
         print("base coordinates: " + str(self.base_coords))
 
         image_name = os.path.splitext(image)[0].split('_')[0]
@@ -123,6 +148,7 @@ class OverlapDetect():
 
         min_img_width = min(i.width for i in imgs)
         min_img_height = min(i.height for i in imgs)
+
         total_width = imgs[0].width
         total_height = imgs[0].height
 
@@ -135,6 +161,8 @@ class OverlapDetect():
                 imgs[i] = img.resize((min_img_height, int(img.height / img.width * min_img_height)), Image.ANTIALIAS)
 
             x_offset, y_offset = self.calculate_offset(self.base_coords, image_coords)
+
+            print([x_offset, y_offset])
 
             if x_offset > 0 and y_offset == 0:
                 total_width += imgs[i].width
@@ -171,7 +199,7 @@ class OverlapDetect():
         img_merge.save(os.path.join(output_path, image_name + '_merged.jpg'))
 
     def draw_bbox(self):
-        output_path = os.path.join(r'C:\Users\brian\PyTorch-YOLOv3\output\samples', 'redrawn_bbox')
+        output_path = os.path.join(r'D:\PyTorch-YOLOv3-master\output\samples', 'redrawn_bbox')
 
         for image in self.image_json:
             img = np.array(Image.open(os.path.join(self.IMG_PATH, image)))
@@ -565,7 +593,7 @@ class OverlapDetect():
     # returns {int}: returns the number of overlapping bounding boxes
     def find_overlap(self):
 
-        self.get_reference_image(r'C:\Users\brian\PyTorch-YOLOv3\data\samples')
+        self.get_reference_image(r'D:\PyTorch-YOLOv3-master\data\samples')
 
         # TODO: the statistics for the overlapping objects can be used to calculate the x and y thresholds
         left_right_x_thresh = 10
